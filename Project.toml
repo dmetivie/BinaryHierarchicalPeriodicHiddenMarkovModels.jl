@@ -20,6 +20,7 @@ ArgCheck = "2"
 ShiftedArrays = "1"
 HMMBase = "1"
 JuMP = "1"
+LsqFit = "0.12"
 julia = "1"
 
 [extras]
