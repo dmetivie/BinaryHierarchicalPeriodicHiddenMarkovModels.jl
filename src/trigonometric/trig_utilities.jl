@@ -112,5 +112,5 @@ function fit_θ!(hmm::HierarchicalPeriodicHMM, 𝐃𝐞𝐠)
     h = Trig2HierarchicalPeriodicHMM(hmm.a, θᴬ, θᴮ, T)
     hmm.A[:] = h.A[:]
     hmm.B[:] = h.B[:]
-    return nothing
+    return θᴬ, θᴮ
 end
