@@ -50,9 +50,8 @@ function fit_mle!(
     LL = zeros(N, K)
 
     # assign category for observation depending in the 𝐘_past 𝐘
-    memory = Int(log(size_memory) / log(2))
     lag_cat = conditional_to(𝐘, 𝐘_past)
-    idx_tj = idx_observation_of_past_cat(lag_cat, n2t, T, K, size_memory)
+    idx_tj = idx_observation_of_past_cat(lag_cat, n2t, T, size_memory)
 
     loglikelihoods!(LL, hmm, 𝐘, lag_cat; n2t=n2t)
     robust && replace!(LL, -Inf => nextfloat(-Inf), Inf => log(prevfloat(Inf)))

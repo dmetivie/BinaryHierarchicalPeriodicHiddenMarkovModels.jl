@@ -1,3 +1,17 @@
+argmaxrow(A::AbstractMatrix{<:Real}) = [argmax(A[i, :]) for i = 1:size(A, 1)]
+
+function cycle(t, T)
+    if 1 ≤ t ≤ T
+        return t
+    elseif T < t ≤ 2T
+        return t - T
+    elseif -T < t ≤ 0
+        return t + T
+    else
+        println("Not implemented")
+    end
+end
+
 n_per_category(s, h, t, y, n_in_t, n_occurence_history) = (n_in_t[t] ∩ n_occurence_history[s, h, y])
 
 bin2digit(x) = sum(x[length(x)-i+1] * 2^(i - 1) for i = 1:length(x)) + 1
@@ -22,6 +36,49 @@ function conditional_to(𝐘::AbstractArray{<:Bool}, 𝐘_past::AbstractArray{<:
     end
 end
 
+function idx_observation_of_past_cat(lag_cat, n2t, T, size_memory)
+    # Matrix(T,D) of vector that give the index of data of same 𝐘_past.
+    # ie. size_memory = 1 (no memory) -> every data is in category 1
+    # ie size_memory = 2 (memory on previous day) -> idx_tj[t,j][1] = vector of index of data where previous day was dry, idx_tj[t,j][2] = index of data where previous day was wet
+    D = size(lag_cat, 2)
+    idx_tj = Matrix{Vector{Vector{Int}}}(undef, T, D)
+    n_in_t = [findall(n2t .== t) for t = 1:T] # could probably be speeded up e.g. recusivly suppressing already classified label with like sortperm
+    for t in OneTo(T)
+        n_t = n_in_t[t]
+        for j = 1:D
+            n_tm = [findall(lag_cat[n_t, j] .== m) for m = 1:size_memory]
+            idx_tj[t, j] = [n_t[n_tm[m]] for m = 1:size_memory]
+            ##
+        end
+    end
+    return idx_tj
+end
+
+function idx_observation_of_past_cat(lag_cat, size_memory)
+    # Matrix(T,D) of vector that give the index of data of same past.
+    # ie. size_memory = 1 (no memory) -> every data is in category 1
+    # ie size_memory = 2 (memory on previous day) -> idx_tj[t,j][1] = vector of index of data where previous day was dry, idx_tj[t,j][2] = index of data where previous day was wet
+    D = size(lag_cat, 2)
+    idx_j = Vector{Vector{Vector{Int}}}(undef, D)
+    for j = 1:D
+        idx_j[j] = [findall(lag_cat[:, j] .== m) for m = 1:size_memory]
+    end
+    return idx_j
+end
+
+random_product_Bernoulli(D::Int, K::Int, size_memory::Int) = [Bernoulli(rand()) for k = 1:K, j = 1:D, m = 1:size_memory]
+
+#TODO add to rand(HierarchicalPeriodicHMM, blabla)
+function randhierarchicalPeriodicHMM(K, T, D, size_memory; ref_station=1, ξ=ones(K) / K)
+    B_rand = Bernoulli.(rand(K, T, D, size_memory))  # completly random -> bad
+    Q_rand = zeros(K, K, T)
+    for t in 1:T
+        Q_rand[:, :, t] = randtransmat(K) # completly random -> bad
+    end
+    hmm_random = HierarchicalPeriodicHMM(ξ, Q_rand, B_rand)
+    sort_wrt_ref!(hmm_random, ref_station)
+    return hmm_random
+end
 # TODO: site dependent memory #
 # function conditional_to(𝐘::AbstractArray, memory::AbstractVector;
 #     𝐘_past=[0 1 0 1 1 0 1 0 0 0
@@ -37,89 +94,3 @@ end
 #     end
 #     return lag_cat
 # end
-
-
-function idx_observation_of_past_cat(lag_cat, n2t, T, K, size_memory)
-    # Matrix(T,D) of vector that give the index of data of same 𝐘_past.
-    # ie. size_memory = 1 (no memory) -> every data is in category 1
-    # ie size_memory = 2 (memory on previous day) -> idx_tj[t,j][1] = vector of index of data where previous day was dry, idx_tj[t,j][2] = index of data where previous day was wet
-    D = size(lag_cat, 2)
-    idx_tj = Matrix{Vector{Vector{Int}}}(undef, T, D)
-    n_in_t = [findall(n2t .== t) for t = 1:T] # could probably be speeded up e.g. recusivly suppressing already classified label with like sortperm
-    @inbounds for t in OneTo(T)
-        n_t = n_in_t[t]
-        for i in OneTo(K)
-            for j = 1:D
-                # apparently the two following takes quite long ~29ms for all the loops
-                # TODO improve time!
-                n_tm = [findall(lag_cat[n_t, j] .== m) for m = 1:size_memory]
-                idx_tj[t, j] = [n_t[n_tm[m]] for m = 1:size_memory]
-                ##
-            end
-        end
-    end
-    return idx_tj
-end
-
-
-#* Trigo part *#
-
-function polynomial_trigo(t::Number, β; T=366)
-    d = (length(β) - 1) ÷ 2
-    if d == 0
-        return β[1]
-    else
-        f = 2π / T
-        # everything is shifted from 1 from usual notation due to array starting at 1
-        return β[1] + sum(β[2*l] * cos(f * l * t) + β[2*l+1] * sin(f * l * t) for l = 1:d)
-    end
-end
-
-function polynomial_trigo(t::AbstractArray, β; T=366)
-    d = (length(β) - 1) ÷ 2
-    if d == 0
-        return β[1]
-    else
-        f = 2π / T
-        # everything is shifted from 1 from usual notation due to array starting at 1
-        return β[1] .+ sum(β[2*l] * cos.(f * l * t) + β[2*l+1] * sin.(f * l * t) for l = 1:d)
-    end
-end
-
-interleave2(args...) = collect(Iterators.flatten(zip(args...))) # merge two vector with alternate elements
-
-function fit_Q!(p::AbstractArray, A::AbstractArray{N,2} where {N}; silence=true)
-    T, K = size(A, 2), size(A, 1)
-    @assert K - 1 == size(p, 1)
-    d = (size(p, 2) - 1) ÷ 2
-    model = Model(Ipopt.Optimizer)
-    silence && set_silent(model)
-    f = 2π / T
-    cos_nj = [cos(f * j * t) for t = 1:T, j = 1:d]
-    sin_nj = [sin(f * j * t) for t = 1:T, j = 1:d]
-
-    trig = [[1; interleave2(cos_nj[t, :], sin_nj[t, :])] for t = 1:T]
-
-    @variable(model, p_jump[k=1:(K-1), j=1:(2d+1)])
-    set_start_value.(p_jump, p)
-    # Polynomial P_kl
-
-    @NLexpression(model, Pol[t=1:T, k=1:K-1], sum(trig[t][j] * p_jump[k, j] for j = 1:length(trig[t])))
-
-    @NLobjective(
-        model,
-        Min,
-        sum((A[k, t] - exp(Pol[t, k]) / (1 + sum(exp(Pol[t, l]) for l = 1:K-1)))^2 for k = 1:K-1, t = 1:T)
-        +
-        sum((A[K, t] - 1 / (1 + sum(exp(Pol[t, l]) for l = 1:K-1)))^2 for t = 1:T)
-    )
-    optimize!(model)
-    p[:, :] = value.(p_jump)
-end
-
-m_Bernoulli(t, p; T=366) = 1 ./ (1 .+ exp.(polynomial_trigo(t, p; T=T)))
-# Fit (faster than JuMP) with LsqFit
-function fit_Y!(p::AbstractVector, B::AbstractVector)
-    T = size(B, 1)
-    p[:] = curve_fit((t, p) -> m_Bernoulli(t, p, T=T), collect(1:T), B, convert(Vector, p)).param
-end

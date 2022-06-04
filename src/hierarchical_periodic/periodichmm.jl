@@ -108,3 +108,10 @@ function sort_wrt_ref!(hmm::HierarchicalPeriodicHMM, ref_station)
         hmm.A[:, :, t] = hmm.A[new_order[t], new_order[t], t]
     end
 end
+
+function sort_wrt_ref!(α::AbstractVector, B::AbstractArray{F,3}, ref_station) where {F<:Bernoulli}
+    K = size(α, 1)
+    sorting = [succprob(B[k, ref_station, 1]) for k = 1:K] # 1 is by my convention the driest category i.e. Y|d....d
+    B[:, :, :] = B[sortperm(sorting, rev=true), :, :]
+    α[:] = α[sortperm(sorting, rev=true)]
+end

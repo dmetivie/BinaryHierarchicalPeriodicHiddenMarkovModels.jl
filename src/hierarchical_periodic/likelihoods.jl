@@ -1,23 +1,63 @@
-function likelihoods!(L::AbstractMatrix, hmm::HierarchicalPeriodicHMM, 𝐘, lag_cat::AbstractMatrix{<:Integer}; n2t=n_to_t(size(L, 1), size(hmm, 3))::AbstractVector{<:Integer})
+#! TODO fix convention 𝐘 size(𝐘) = D, N not the opposite. (Here it does not change)
+function likelihoods!(L::AbstractMatrix, hmm::HierarchicalPeriodicHMM, 𝐘::AbstractMatrix, lag_cat::AbstractMatrix{<:Integer}; n2t=n_to_t(size(L, 1), size(hmm, 3))::AbstractVector{<:Integer})
     N, K, D = size(𝐘, 1), size(hmm, 1), size(hmm, 2)
     @argcheck size(L) == (N, K)
 
-    @inbounds for i in OneTo(K), n in OneTo(N)
-        t = n2t[n] # periodic t
-        L[n, i] = pdf(product_distribution(hmm.B[CartesianIndex.(i, t, 1:D, lag_cat[n, :])]), 𝐘[n, :])
+    for i in OneTo(K)
+        for n in OneTo(N)
+            t = n2t[n] # periodic t
+            L[n, i] = pdf(product_distribution(hmm.B[CartesianIndex.(i, t, 1:D, lag_cat[n, :])]), 𝐘[n, :])
+        end
     end
 end
 
-function loglikelihoods!(LL::AbstractMatrix, hmm::HierarchicalPeriodicHMM, 𝐘, lag_cat::AbstractMatrix{<:Integer}; n2t=n_to_t(size(LL, 1), size(hmm, 3))::AbstractVector{<:Integer})
+function loglikelihoods!(LL::AbstractMatrix, hmm::HierarchicalPeriodicHMM, 𝐘::AbstractMatrix, lag_cat::AbstractMatrix{<:Integer}; n2t=n_to_t(size(LL, 1), size(hmm, 3))::AbstractVector{<:Integer})
     N, K, D = size(𝐘, 1), size(hmm, 1), size(hmm, 2)
     @argcheck size(LL) == (N, K)
 
-    @inbounds for i in OneTo(K), n in OneTo(N)
-        t = n2t[n] # periodic t
-        LL[n, i] = logpdf(product_distribution(hmm.B[CartesianIndex.(i, t, 1:D, lag_cat[n, :])]), 𝐘[n, :])
+    for i in OneTo(K)
+        for n in OneTo(N)
+            t = n2t[n]
+            LL[n, i] = logpdf(product_distribution(hmm.B[CartesianIndex.(i, t, 1:D, lag_cat[n, :])]), 𝐘[n, :])
+        end
     end
 end
 
+function loglikelihoods!(LL::AbstractMatrix, B::AbstractArray{F,2} where {F<:MultivariateDistribution}, 𝐘::AbstractMatrix; n2t=n_to_t(size(𝐘, 1), size(B, 2))::AbstractVector{<:Integer})
+    N, K = size(𝐘, 1), size(B, 1)
+    @argcheck size(LL) == (N, K)
+
+    for n in OneTo(N)
+        t = n2t[n]
+        for k in OneTo(K)
+            LL[n, k] = logpdf(B[k, t], 𝐘[n, :])
+        end
+    end
+end
+
+function loglikelihoods!(LL::AbstractMatrix, B::AbstractArray{F,2} where {F<:UnivariateDistribution}, 𝐘::AbstractVector; n2t=n_to_t(size(𝐘, 1), size(B, 2))::AbstractVector{<:Integer})
+    N, K = size(𝐘, 1), size(B, 1)
+    @argcheck size(LL) == (N, K)
+
+    for k in OneTo(K)
+        for n in OneTo(N)
+            t = n2t[n]
+            LL[n, k] = logpdf(B[k, t], 𝐘[n])
+        end
+    end
+end
+
+function loglikelihoods!(LL::AbstractMatrix, B::AbstractArray{F,4} where {F<:UnivariateDistribution}, 𝐘::AbstractMatrix, lag_cat::AbstractMatrix{<:Integer}; n2t=n_to_t(size(𝐘, 1), size(B, 2))::AbstractVector{<:Integer})
+    N, K, D = size(𝐘, 1), size(B, 1), size(𝐘, 2)
+    @argcheck size(LL) == (N, K)
+
+    for k in OneTo(K)
+        for n in OneTo(N)
+            t = n2t[n]
+            LL[n, k] = logpdf(product_distribution(B[CartesianIndex.(k, t, 1:D, lag_cat[n, :])]), 𝐘[n, :])
+        end
+    end
+end
 # * Bayesian Criterion * #
 
 #!TODO: change `lag_cat = conditional_to(y, memory)` to `lag_cat = conditional_to(y, y_past)`

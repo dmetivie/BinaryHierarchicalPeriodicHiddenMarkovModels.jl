@@ -62,8 +62,8 @@ function update_B!(B::AbstractArray{T,4} where {T}, θᴮ::AbstractArray{N,4} wh
     γₛ!(γₛ, γ, n_all) # update coefficient in JuMP model
 
     all_iter = Iterators.product(1:K, 1:D, 1:size_memory)
-
-    θ_res = pmap(tup -> fit_mle_one_B(θᴮ[tup..., :], model_B, γₛ[tup..., :, :]; warm_start=warm_start), all_iter)
+    #! TODO pmap option
+    θ_res = map(tup -> fit_mle_one_B(θᴮ[tup..., :], model_B, γₛ[tup..., :, :]; warm_start=warm_start), all_iter)
 
     for (k, s, h) in all_iter
         θᴮ[k, s, h, :] = θ_res[k, s, h]
@@ -158,7 +158,8 @@ function update_A!(
     ## 
     # ξ are the filtering probablies
     s_ξ!(s_ξ, ξ, n_in_t)
-    θ_res = pmap(k -> fit_mle_one_A(θᴬ[k, :, :], model_A, s_ξ[:, k, :]; warm_start = warm_start), 1:K)
+    #! TODO pmap option
+    θ_res = map(k -> fit_mle_one_A(θᴬ[k, :, :], model_A, s_ξ[:, k, :]; warm_start = warm_start), 1:K)
 
     for k = 1:K
         θᴬ[k, :, :] = θ_res[k][:, :]
@@ -279,8 +280,13 @@ function fit_mle!(
         posteriors!(γ, α, β)
     
         logtotp = sum(c)
-        (display == :iter) && println(now(), " Iteration $it: logtot = $logtotp")
-        flush(stdout)
+
+        if display == :iter
+            ΔmaxA = round(maximum(abs, all_θᴬᵢ[it+1] - all_θᴬᵢ[it]), digits=5)
+            ΔmaxB = round(maximum(abs, all_θᴮᵢ[it+1] - all_θᴮᵢ[it]), digits=5)
+            println("Iteration $it: logtot = $(round(logtotp, digits = 6)), max(|θᴬᵢ-θᴬᵢ₋₁|) = ", ΔmaxA, " & max(|θᴮᵢ-θᴮᵢ₋₁|) = ", ΔmaxB)
+            # flush(stdout)
+        end
     
         push!(history.logtots, logtotp)
         history.iterations += 1
@@ -309,13 +315,13 @@ function fit_mle(hmm::HierarchicalPeriodicHMM,
     θᴮ::AbstractArray{<:AbstractFloat,4},
     𝐘::AbstractArray{<:Bool},
     𝐘_past::AbstractArray{<:Bool}; 
-    all_iters=false, kwargs...)
+    θ_iters=false, kwargs...)
 
     hmm = copy(hmm)
     θᴬ = copy(θᴬ)
     θᴮ = copy(θᴮ)
-    history, all_θᴬᵢ, all_θᴮᵢ = fit_mle!(hmm, 𝐘, n2t, θᴬ, θᴮ; kwargs...)
-    if all_iters == true
+    history, all_θᴬᵢ, all_θᴮᵢ = fit_mle!(hmm, θᴬ, θᴮ, 𝐘, 𝐘_past; kwargs...)
+    if θ_iters == true
         return hmm, θᴬ, θᴮ, history, all_θᴬᵢ, all_θᴮᵢ
     else
         return hmm, θᴬ, θᴮ, history
@@ -414,7 +420,7 @@ end
 #         posteriors!(γ, α, β)
 
 #         logtotp = sum(c)
-#         (display == :iter) && println(now(), " Iteration $it: logtot = $logtotp")
+#         (display == :iter) && println("Iteration $it: logtot = $logtotp")
 #         flush(stdout)
 
 #         push!(history.logtots, logtotp)
