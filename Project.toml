@@ -22,7 +22,7 @@ HMMBase = "1"
 Ipopt = "1"
 JuMP = "1"
 LsqFit = "0.12"
-ShiftedArrays = "1"
+ShiftedArrays = "1, 2"
 julia = "1"
 
 [extras]
