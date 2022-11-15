@@ -55,29 +55,39 @@ function assert_hmm(a::AbstractVector, A::AbstractArray{T,3} where {T}, B::Abstr
     return true
 end
 
-#! Function could/should be optimzed (for example depending on memory value, or succprob is taken once or )
+#TODO? Function could/should be optimzed (for example depending on order value, or succprob is taken once or )
+#TODO I wanted to re-use the rand() in PeriodicHiddenMarkovModels which works for AbstractPeriodicHMM, but I encountered unsupported keyword errors
+# rand(hmm_fit, n2t) works 
+# rand(hmm_fit, n2t; z_init = 1) does not work 
+# ERROR: MethodError: no method matching rand(::HierarchicalPeriodicHMM{Univariate, Float64}, ::Vector{Int64}; z_init=1)
+# Closest candidates are:
+#   rand(::HMMBase.AbstractHMM, ::AbstractVector{<:Integer}) at C:\Users\metivier\.julia\packages\HMMBase\ZYC4P\src\hmm.jl:183 got unsupported keyword argument "z_init"
+#   rand(::AR1{<:AbstractMatrix}, ::AbstractVector{<:Integer}, ::AbstractVector{<:Integer}; y₁) at C:\Users\metivier\.julia\dev\PeriodicAutoRegressive\src\AR1.jl:41 got unsupported keyword argument "z_init"
+#   rand(::AR1{<:AbstractVector}, ::AbstractVector{<:Integer}; y₁) at C:\Users\metivier\.julia\dev\PeriodicAutoRegressive\src\AR1.jl:31 got unsupported keyword argument "z_init"
+
 function rand(
     rng::AbstractRNG,
     hmm::HierarchicalPeriodicHMM,
-    z::AbstractVector{<:Integer};
-    n2t=n_to_t(size(z, 1), size(hmm, 3))::AbstractVector{<:Integer},
-    yini=rand(Bernoulli(), Int(log2(size(hmm, 4))), size(hmm, 2))
+    z::AbstractVector{<:Integer},
+    n2t::AbstractVector{<:Integer};
+    y_ini=rand(Bernoulli(), Int(log2(size(hmm, 4))), size(hmm, 2))
 )
     D = size(hmm, 2)
     y = Matrix{Bool}(undef, length(z), D)
-    memory = Int(log2(size(hmm, 4)))
+    order = Int(log2(size(hmm, 4)))
 
     # @argcheck length(n2t) == length(z)
-    @argcheck size(yini, 1) == memory "Initial condition size is not correct you give $(size(yini, 1)) instead of $(memory)" # Did we gave the correct number of initial conditions
+    # Check the initial conditions
+    @argcheck size(y_ini) == (order, D) "Initial condition is not correct: You give $(size(y_ini)) instead of $((order, D))" 
 
     p = zeros(D)
-    if memory > 0
-        # One could do some specialized for each value of memory e.g. for memory = 1, we have simply previous_day_category = y[n-1,:].+1
-        y[1:memory, :] = yini
+    if order > 0
+        # One could do some specialized for each value of order e.g. for order = 1, we have simply previous_day_category = y[n-1,:].+1
+        y[1:order, :] = y_ini
         previous_day_category = zeros(Int, D)
-        for n in eachindex(z)[memory+1:end]
+        for n in eachindex(z)[order+1:end]
             t = n2t[n] # periodic t
-            previous_day_category[:] = bin2digit.(eachcol([y[n-m, j] for m = 1:memory, j = 1:D]))
+            previous_day_category[:] = bin2digit.(eachcol([y[n-m, j] for m = 1:order, j = 1:D]))
             p[:] = succprob.(hmm.B[CartesianIndex.(z[n], t, 1:D, previous_day_category)])
             y[n, :] = rand(rng, Product(Bernoulli.(p)))
         end

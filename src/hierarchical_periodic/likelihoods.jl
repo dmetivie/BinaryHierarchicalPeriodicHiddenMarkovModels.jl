@@ -75,11 +75,11 @@ function loglikelihoods(hmm::HierarchicalPeriodicHMM, 𝐘::AbstractArray{<:Bool
 end
 # * Bayesian Criterion * #
 
-#!TODO: change `lag_cat = conditional_to(y, memory)` to `lag_cat = conditional_to(y, y_past)`
+#!TODO: change `lag_cat = conditional_to(y, order)` to `lag_cat = conditional_to(y, y_past)`
 function complete_loglikelihood(hmm::HierarchicalPeriodicHMM, y::AbstractArray, z::AbstractVector; n2t=n_to_t(size(𝐘, 1), size(hmm.B, 2))::AbstractVector{<:Integer})
-    N, size_memory, D = size(y, 1), size(hmm, 4), size(y, 2)
-    memory = Int(log(size_memory) / log(2))
-    lag_cat = conditional_to(y, memory)
+    N, size_order, D = size(y, 1), size(hmm, 4), size(y, 2)
+    order = Int(log(size_order) / log(2))
+    lag_cat = conditional_to(y, order)
 
     return sum(log(hmm.A[z[n], z[n+1], n2t[n]]) for n = 1:N-1) + sum(logpdf(product_distribution(hmm.B[CartesianIndex.(z[n], n2t[n], 1:D, lag_cat[n, :])]), y[n, :]) for n = 1:N)
 end

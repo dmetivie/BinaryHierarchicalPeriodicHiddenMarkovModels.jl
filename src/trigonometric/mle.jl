@@ -1,6 +1,6 @@
 function γₛ!(γₛ, γ, n_all)
-    K, D, size_memory, T, rain_cat = size(γₛ)
-    for tup in Iterators.product(1:D, 1:size_memory, 1:T, 1:rain_cat)
+    K, D, size_order, T, rain_cat = size(γₛ)
+    for tup in Iterators.product(1:D, 1:size_order, 1:T, 1:rain_cat)
         for k = 1:K
             γₛ[k, tup...] = sum(γ[n, k] for n in n_all[tup...]; init = 0)
         end
@@ -55,13 +55,13 @@ function update_B!(B::AbstractArray{T,4} where {T}, θᴮ::AbstractArray{N,4} wh
     K = size(B, 1)
     T = size(B, 2)
     D = size(B, 3)
-    size_memory = size(B, 4)
+    size_order = size(B, 4)
     ## For periodicHMM only the n 𝐘 corresponding to B(t) are used to update B(t)
     ## Update the smoothing parameters in the JuMP model
 
     γₛ!(γₛ, γ, n_all) # update coefficient in JuMP model
 
-    all_iter = Iterators.product(1:K, 1:D, 1:size_memory)
+    all_iter = Iterators.product(1:K, 1:D, 1:size_order)
     #! TODO pmap option
     θ_res = map(tup -> fit_mle_one_B(θᴮ[tup..., :], model_B, γₛ[tup..., :, :]; warm_start=warm_start), all_iter)
 
@@ -69,7 +69,7 @@ function update_B!(B::AbstractArray{T,4} where {T}, θᴮ::AbstractArray{N,4} wh
         θᴮ[k, s, h, :] = θ_res[k, s, h]
     end
 
-    p = [1 / (1 + exp(polynomial_trigo(t, θᴮ[k, s, h, :], T = T))) for k = 1:K, t = 1:T, s = 1:D, h = 1:size_memory]
+    p = [1 / (1 + exp(polynomial_trigo(t, θᴮ[k, s, h, :], T = T))) for k = 1:K, t = 1:T, s = 1:D, h = 1:size_order]
     B[:, :, :, :] = Bernoulli.(p)
 end
 
@@ -214,7 +214,7 @@ function fit_mle!(
     @argcheck display in [:none, :iter, :final]
     @argcheck maxiter >= 0
 
-    N, K, T, size_memory, D = size(𝐘, 1), size(hmm, 1), size(hmm, 3), size(hmm, 4), size(hmm, 2)
+    N, K, T, size_order, D = size(𝐘, 1), size(hmm, 1), size(hmm, 3), size(hmm, 4), size(hmm, 2)
 
     deg_θᴬ = (size(θᴬ, 3) - 1) ÷ 2
     deg_θᴮ = (size(θᴮ, 4) - 1) ÷ 2
@@ -224,23 +224,23 @@ function fit_mle!(
 
     all_θᴬᵢ = [copy(θᴬ)]
     all_θᴮᵢ = [copy(θᴮ)]
-    # Allocate memory for in-place updates
+    # Allocate order for in-place updates
     c = zeros(N)
     α = zeros(N, K)
     β = zeros(N, K)
     γ = zeros(N, K) # regular smoothing proba
-    γₛ = zeros(K, D, size_memory, T, rain_cat) # summed smoothing proba
+    γₛ = zeros(K, D, size_order, T, rain_cat) # summed smoothing proba
     ξ = zeros(N, K, K)
     s_ξ = zeros(T, K, K)
     LL = zeros(N, K)
 
     # assign category for observation depending in the 𝐘_past 𝐘
-    memory = Int(log2(size_memory))
+    order = Int(log2(size_order))
     lag_cat = conditional_to(𝐘, 𝐘_past)
 
     n_in_t = [findall(n2t .== t) for t = 1:T]
-    n_occurence_history = [findall(.&(𝐘[:, j] .== y, lag_cat[:, j] .== h)) for j = 1:D, h = 1:size_memory, y = 0:1] # dry or wet
-    n_all = [n_per_category(tup..., n_in_t, n_occurence_history) for tup in Iterators.product(1:D, 1:size_memory, 1:T, 1:rain_cat)]
+    n_occurence_history = [findall(.&(𝐘[:, j] .== y, lag_cat[:, j] .== h)) for j = 1:D, h = 1:size_order, y = 0:1] # dry or wet
+    n_all = [n_per_category(tup..., n_in_t, n_occurence_history) for tup in Iterators.product(1:D, 1:size_order, 1:T, 1:rain_cat)]
 
     model_A = model_for_A(s_ξ[:, 1, :], deg_θᴬ, silence=silence) # JuMP Model for transition matrix
     model_B = model_for_B(γₛ[1, 1, 1, :, :], deg_θᴮ, silence=silence) # JuMP Model for Emmission distribution
@@ -328,14 +328,14 @@ function fit_mle(hmm::HierarchicalPeriodicHMM,
     end
 end
 
-# TODO add possibility of memory different at each site
+# TODO add possibility of order different at each site
 # function fit_mle!(
 #     hmm::HierarchicalPeriodicHMM,
 #     𝐘::AbstractArray,
 #     n2t::AbstractArray{Int},
 #     θᴬ::AbstractArray{TQ,3} where {TQ},
 #     θᴮ::AbstractArray{TY,4} where {TY},
-#     size_memories::AbstractVector # Vector of all local memory when there are not indentical
+#     size_memories::AbstractVector # Vector of all local order when there are not indentical
 #     ;
 #     display = :none,
 #     maxiter = 100,
@@ -354,7 +354,7 @@ end
 
 #     N, K, T, D = size(𝐘, 1), size(hmm, 1), size(hmm, 3), size(hmm, 2)
 #     @argcheck length(size_memories) == D
-#     max_size_memory = maximum(size_memories)
+#     max_size_order = maximum(size_memories)
 
 #     deg_θᴬ = (size(θᴬ, 3) - 1) ÷ 2
 #     deg_θᴮ = (size(θᴮ, 4) - 1) ÷ 2
@@ -364,12 +364,12 @@ end
 
 #     all_θᴬᵢ = [copy(θᴬ)]
 #     all_θᴮᵢ = [copy(θᴮ)]
-#     # Allocate memory for in-place updates
+#     # Allocate order for in-place updates
 #     c = zeros(N)
 #     α = zeros(N, K)
 #     β = zeros(N, K)
 #     γ = zeros(N, K) # regular smoothing proba
-#     γₛ = zeros(K, D, max_size_memory, T, rain_cat) # summed smoothing proba
+#     γₛ = zeros(K, D, max_size_order, T, rain_cat) # summed smoothing proba
 #     ξ = zeros(N, K, K)
 #     s_ξ = zeros(T, K, K)
 #     LL = zeros(N, K)
@@ -379,8 +379,8 @@ end
 #     lag_cat = conditional_to(𝐘, 𝐘_past)
 
 #     n_in_t = [findall(n2t .== t) for t = 1:T]
-#     n_occurence_history = [findall(.&(𝐘[:, j] .== y, lag_cat[:, j] .== h)) for j = 1:D, h = 1:max_size_memory, y = 0:1]
-#     n_all = [n_per_category(tup..., n_in_t, n_occurence_history) for tup in Iterators.product(1:D, 1:max_size_memory, 1:T, 1:rain_cat)]
+#     n_occurence_history = [findall(.&(𝐘[:, j] .== y, lag_cat[:, j] .== h)) for j = 1:D, h = 1:max_size_order, y = 0:1]
+#     n_all = [n_per_category(tup..., n_in_t, n_occurence_history) for tup in Iterators.product(1:D, 1:max_size_order, 1:T, 1:rain_cat)]
 
 #     model_A = model_for_A(s_ξ[:, 1, :], deg_θᴬ, silence = silence) # JuMP Model for transition matrix
 #     model_B = model_for_B(γₛ[1, 1, 1, :, :], deg_θᴮ, silence = silence) # JuMP Model for Emmission distribution

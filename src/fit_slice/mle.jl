@@ -76,8 +76,8 @@ function fit_mle_B_slice!(α::AbstractVector, B::AbstractArray{F,3} where {F<:Be
     Dirichlet_α=0.8,
     ref_station=1, kwargs...)
 
-    size_memory = size(B, 3)
-    Idx = idx_observation_of_past_cat(lag_cat, size_memory)
+    size_order = size(B, 3)
+    Idx = idx_observation_of_past_cat(lag_cat, size_order)
 
     if rand_ini == true
         α[:], B[:], h = fit_em_multiD_rand(α, B, 𝐘, lag_cat, Idx; n_random_ini=n_random_ini, Dirichlet_α=Dirichlet_α, display_random=display_random, kwargs...)
@@ -94,7 +94,7 @@ function fit_em_multiD_rand(α::AbstractVector, B::AbstractArray{F,3} where {F<:
 
     D = size(𝐘, 2)
     K = size(α, 1)
-    size_memory = size(B, 3)
+    size_order = size(B, 3)
 
     h = fit_em_multiD!(α, B, 𝐘, lag_cat, idx_j; kwargs...)
     log_max = h.logtots[end]
@@ -102,7 +102,7 @@ function fit_em_multiD_rand(α::AbstractVector, B::AbstractArray{F,3} where {F<:
     h_max = h
     (display_random == :iter) && println("random IC 1: logtot = $(h.logtots[end])")
     for i = 1:(n_random_ini-1)
-        B[:, :, :] = random_product_Bernoulli(D, K, size_memory)
+        B[:, :, :] = random_product_Bernoulli(D, K, size_order)
         α[:] = rand(Dirichlet(K, Dirichlet_α))
         h = fit_em_multiD!(α, B, 𝐘, lag_cat, idx_j; kwargs...)
         (display_random == :iter) && println("random IC $(i+1): logtot = $(h.logtots[end])")
@@ -122,10 +122,10 @@ function fit_em_multiD!(α::AbstractVector, B::AbstractArray{F,3} where {F<:Bern
     @argcheck display in [:none, :iter, :final]
     @argcheck maxiter >= 0
 
-    N, K, D, size_memory = size(𝐘, 1), size(B, 1), size(B, 2), size(B, 3)
+    N, K, D, size_order = size(𝐘, 1), size(B, 1), size(B, 2), size(B, 3)
     history = EMHistory(false, 0, [])
 
-    # Allocate memory for in-place updates
+    # Allocate order for in-place updates
 
     LL = zeros(N, K)
     γ = similar(LL)
@@ -157,7 +157,7 @@ function fit_em_multiD!(α::AbstractVector, B::AbstractArray{F,3} where {F<:Bern
         α[:] = mean(γ, dims=1)
         for k in OneTo(K)
             for j = 1:D
-                for m = 1:size_memory
+                for m = 1:size_order
                     if sum(γ[idx_j[j][m], k]) > 0
                         B[k, j, m] = fit_mle(Bernoulli, 𝐘[idx_j[j][m], j], γ[idx_j[j][m], k])
                     else

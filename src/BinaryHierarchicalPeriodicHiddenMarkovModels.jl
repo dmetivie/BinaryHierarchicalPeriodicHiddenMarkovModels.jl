@@ -15,15 +15,16 @@ using ArgCheck
 using Random: AbstractRNG, GLOBAL_RNG
 using LogExpFunctions: logsumexp
 
-import Base: ==, copy, rand, size
+import Base: ==, copy, size
 import HMMBase: fit_mle!, fit_mle
-import PeriodicHiddenMarkovModels: forward, backward, forwardlog!, backwardlog!, viterbi, viterbi!, viterbilog!
+import PeriodicHiddenMarkovModels: rand, forward, backward, forwardlog!, backwardlog!, viterbi, viterbi!, viterbilog!
 
 export
     # periodichmm.jl
     HierarchicalPeriodicHMM,
     sort_wrt_ref!,
     randhierarchicalPeriodicHMM,
+    rand,
     # messages.jl
     forward,
     backward,

@@ -4,7 +4,7 @@
 """
 
 function Trig2HierarchicalPeriodicHMM(a::AbstractVector, θᴬ::AbstractArray{<:AbstractFloat,3}, θᴮ::AbstractArray{<:AbstractFloat,4}, T::Integer)
-    K, D, size_memory = size(θᴮ)
+    K, D, size_order = size(θᴮ)
     @assert K == size(θᴬ, 1)
 
     A = zeros(K, K, T)
@@ -19,7 +19,7 @@ function Trig2HierarchicalPeriodicHMM(a::AbstractVector, θᴬ::AbstractArray{<:
         A[k, l, t] /= normalization_polynomial[k, t]
     end
 
-    p = [1 / (1 + exp(polynomial_trigo(t, θᴮ[k, s, h, :], T=T))) for k = 1:K, t = 1:T, s = 1:D, h = 1:size_memory]
+    p = [1 / (1 + exp(polynomial_trigo(t, θᴮ[k, s, h, :], T=T))) for k = 1:K, t = 1:T, s = 1:D, h = 1:size_order]
 
     return HierarchicalPeriodicHMM(a, A, Bernoulli.(p))
 end
@@ -87,12 +87,12 @@ function fit_θᴮ!(p::AbstractVector, B::AbstractVector)
 end
 
 function fit_θ(hmm::HierarchicalPeriodicHMM, 𝐃𝐞𝐠)
-    K, D, size_memory = size(hmm)[[1, 2, 4]]
+    K, D, size_order = size(hmm)[[1, 2, 4]]
     θᴬ = zeros(K, K - 1, 2𝐃𝐞𝐠 + 1)
-    θᴮ = zeros(K, D, size_memory, 2𝐃𝐞𝐠 + 1)
+    θᴮ = zeros(K, D, size_order, 2𝐃𝐞𝐠 + 1)
     for k in 1:K
         fit_θᴬ!(@view(θᴬ[k, :, :]), hmm.A[k, :, :])
-        for j in 1:D, m in 1:size_memory
+        for j in 1:D, m in 1:size_order
             fit_θᴮ!(@view(θᴮ[k, j, m, :]), succprob.(hmm.B[k, :, j, m]))
         end
     end
@@ -100,12 +100,12 @@ function fit_θ(hmm::HierarchicalPeriodicHMM, 𝐃𝐞𝐠)
 end
 
 function fit_θ!(hmm::HierarchicalPeriodicHMM, 𝐃𝐞𝐠)
-    K, D, T, size_memory = size(hmm)
+    K, D, T, size_order = size(hmm)
     θᴬ = zeros(K, K - 1, 2𝐃𝐞𝐠 + 1)
-    θᴮ = zeros(K, D, size_memory, 2𝐃𝐞𝐠 + 1)
+    θᴮ = zeros(K, D, size_order, 2𝐃𝐞𝐠 + 1)
     for k in 1:K
         fit_θᴬ!(@view(θᴬ[k, :, :]), hmm.A[k, :, :])
-        for j in 1:D, m in 1:size_memory
+        for j in 1:D, m in 1:size_order
             fit_θᴮ!(@view(θᴮ[k, j, m, :]), succprob.(hmm.B[k, :, j, m]))
         end
     end

@@ -5,13 +5,13 @@ function update_B!(B::AbstractArray{T,4} where {T}, γ::AbstractMatrix, 𝐘::Ab
     K = size(B, 1)
     T = size(B, 2)
     D = size(B, 3)
-    size_memory = size(B, 4)
+    size_order = size(B, 4)
     ## For periodicHMM only the n 𝐘 corresponding to B(t) are used to update B(t)
 
     @inbounds for t in OneTo(T)
         for i in OneTo(K)
             for j = 1:D
-                for m = 1:size_memory
+                for m = 1:size_order
                     if sum(γ[idx_tj[t, j][m], i]) > 0
                         B[i, t, j, m] = estimator(Bernoulli, 𝐘[idx_tj[t, j][m], j], γ[idx_tj[t, j][m], i])
                     else
@@ -37,11 +37,11 @@ function fit_mle!(
     @argcheck display in [:none, :iter, :final]
     @argcheck maxiter >= 0
 
-    N, K, T, size_memory = size(𝐘, 1), size(hmm, 1), size(hmm, 3), size(hmm, 4)
+    N, K, T, size_order = size(𝐘, 1), size(hmm, 1), size(hmm, 3), size(hmm, 4)
     @argcheck T == size(hmm.B, 2)
     history = EMHistory(false, 0, [])
 
-    # Allocate memory for in-place updates
+    # Allocate order for in-place updates
     c = zeros(N)
     α = zeros(N, K)
     β = zeros(N, K)
@@ -51,7 +51,7 @@ function fit_mle!(
 
     # assign category for observation depending in the 𝐘_past 𝐘
     lag_cat = conditional_to(𝐘, 𝐘_past)
-    idx_tj = idx_observation_of_past_cat(lag_cat, n2t, T, size_memory)
+    idx_tj = idx_observation_of_past_cat(lag_cat, n2t, T, size_order)
 
     loglikelihoods!(LL, hmm, 𝐘, lag_cat; n2t=n2t)
     robust && replace!(LL, -Inf => nextfloat(-Inf), Inf => log(prevfloat(Inf)))
