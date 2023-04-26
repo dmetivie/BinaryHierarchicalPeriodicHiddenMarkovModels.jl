@@ -1,8 +1,7 @@
 """
     Trig2HierarchicalPeriodicHMM(a::AbstractVector, θᴬ::AbstractArray{<:AbstractFloat,3}, θᴮ::AbstractArray{<:AbstractFloat,4}, T::Integer)
-    Takes trigonometric parameters `θᴬ[k∈[1,K], l∈[1,K-1], d∈[1,𝐃𝐞𝐠]`, `θᴬ[k∈[1,K], l∈[1,K-1], d∈[1,𝐃𝐞𝐠]` ]
+Takes trigonometric parameters `θᴬ[k∈[1,K], l∈[1,K-1]`, `d∈[1,𝐃𝐞𝐠]`, `θᴬ[k∈[1,K]`, `l∈[1,K-1]`, `d∈[1,𝐃𝐞𝐠]`
 """
-
 function Trig2HierarchicalPeriodicHMM(a::AbstractVector, θᴬ::AbstractArray{<:AbstractFloat,3}, θᴮ::AbstractArray{<:AbstractFloat,4}, T::Integer)
     K, D, size_order = size(θᴮ)
     @assert K == size(θᴬ, 1)
@@ -26,7 +25,7 @@ end
 
 Trig2HierarchicalPeriodicHMM(θᴬ::AbstractArray{<:AbstractFloat,3}, θᴮ::AbstractArray{<:AbstractFloat,4}, T::Integer) = Trig2HierarchicalPeriodicHMM(ones(size(θᴬ, 1)) ./ size(θᴬ, 1), θᴬ, θᴮ, T)
 
-function polynomial_trigo(t::Number, β; T=366)
+function polynomial_trigo(t::Integer, β; T=366)
     d = (length(β) - 1) ÷ 2
     if d == 0
         return β[1]
@@ -37,7 +36,7 @@ function polynomial_trigo(t::Number, β; T=366)
     end
 end
 
-function polynomial_trigo(t::AbstractArray, β; T=366)
+function polynomial_trigo(t::AbstractArray{F}, β; T=366) where {F<:Integer}
     d = (length(β) - 1) ÷ 2
     if d == 0
         return β[1]
